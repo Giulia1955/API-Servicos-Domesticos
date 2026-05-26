@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plataforma de Serviços Locais</title>
+    
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
+    <style>
+        .d-none-custom { display: none !important; }
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* Centralização de formulários (Login/Registro) */
+        .auth-container { min-height: 80vh; display: flex; align-items: center; justify-content: center; }
+        .card-auth { width: 100%; max-width: 450px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border-radius: 12px; border: none; }
+        
+        /* Ajustes de UI para as telas do painel */
+        .page-title { margin-bottom: 1.5rem; font-weight: 600; color: #333; }
+        .card-service { transition: transform 0.2s; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .card-service:hover { transform: translateY(-5px); }
+        
+        /* Chat UI */
+        .chat-box { height: 400px; overflow-y: auto; background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .msg-bubble { max-width: 75%; padding: 10px 15px; border-radius: 15px; font-size: 0.95rem; }
+        .msg-sent { background-color: #0d6efd; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .msg-received { background-color: #e9ecef; color: black; align-self: flex-start; border-bottom-left-radius: 2px; }
+    </style>
+</head>
+<body>
+
+    <!-- NAVBAR -->
+    <nav id="navbar" class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top d-none-custom">
+        <div class="container">
+            <a class="navbar-brand" href="#" onclick="navigateTo('dashboard')"><i class="bi bi-tools"></i> Serviços Locais</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="#" onclick="navigateTo('dashboard')">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" onclick="navigateTo('services')">Serviços</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" onclick="navigateTo('requests')">Minhas Solicitações</a></li>
+                </ul>
+                <div class="d-flex align-items-center text-white">
+                    <span id="user-greeting" class="me-3 small fw-bold"></span>
+                    <button class="btn btn-outline-light btn-sm" onclick="logout()">Sair</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4 mb-5" id="app-container">
+
+        <!-- ================= TELA: LOGIN ================= -->
+        <div id="view-login" class="view-section">
+            <div class="auth-container">
+                <div class="card card-auth p-4">
+                    <h3 class="text-center mb-4"><i class="bi bi-box-arrow-in-right text-primary"></i> Acesso</h3>
+                    <div id="login-alert" class="alert alert-danger d-none-custom small"></div>
+                    <form id="form-login">
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">E-mail</label>
+                            <input type="email" class="form-control" id="login-email" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label text-muted small">Senha</label>
+                            <input type="password" class="form-control" id="login-password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold" id="btn-login">Entrar</button>
+                    </form>
+                    <div class="text-center mt-3 small">
+                        Não tem conta? <a href="#" onclick="navigateTo('register')" class="text-decoration-none">Cadastre-se</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TELA: REGISTRO ================= -->
+        <div id="view-register" class="view-section d-none-custom">
+            <div class="auth-container">
+                <div class="card card-auth p-4">
+                    <h3 class="text-center mb-4"><i class="bi bi-person-plus text-success"></i> Nova Conta</h3>
+                    <div id="register-alert" class="alert alert-danger d-none-custom small"></div>
+                    <form id="form-register">
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Nome Completo</label>
+                            <input type="text" class="form-control" id="reg-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">E-mail</label>
+                            <input type="email" class="form-control" id="reg-email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Senha</label>
+                            <input type="password" class="form-control" id="reg-password" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label text-muted small">Você é:</label>
+                            <select class="form-select" id="reg-role" required>
+                                <option value="client">Cliente (Quero contratar)</option>
+                                <option value="provider">Prestador (Quero trabalhar)</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100 fw-bold" id="btn-register">Criar Conta</button>
+                    </form>
+                    <div class="text-center mt-3 small">
+                        Já tem conta? <a href="#" onclick="navigateTo('login')" class="text-decoration-none">Faça Login</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TELA: DASHBOARD ================= -->
+        <div id="view-dashboard" class="view-section d-none-custom">
+            <h2 class="page-title">Painel de Controle</h2>
+            <div class="row g-3">
+                <div class="col-md-6 col-lg-4">
+                    <div class="card bg-primary text-white h-100 border-0 rounded-3">
+                        <div class="card-body">
+                            <h5>Catálogo de Serviços</h5>
+                            <p class="small">Encontre profissionais para sua necessidade.</p>
+                            <button class="btn btn-light btn-sm mt-2" onclick="navigateTo('services')">Acessar Serviços</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="card bg-success text-white h-100 border-0 rounded-3">
+                        <div class="card-body">
+                            <h5>Minhas Solicitações</h5>
+                            <p class="small">Acompanhe os pedidos e chats ativos.</p>
+                            <button class="btn btn-light btn-sm mt-2" onclick="navigateTo('requests')">Acessar Solicitações</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TELA: SERVIÇOS ================= -->
+        <div id="view-services" class="view-section d-none-custom">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="page-title mb-0">Serviços Disponíveis</h2>
+                <!-- Botão visível apenas para Provider -->
+                <button class="btn btn-primary d-none-custom" id="btn-new-service" data-bs-toggle="modal" data-bs-target="#modal-create-service">
+                    <i class="bi bi-plus-lg"></i> Criar Serviço
+                </button>
+            </div>
+            
+            <!-- Barra de Busca -->
+            <div class="card mb-4 border-0 shadow-sm">
+                <div class="card-body d-flex gap-2">
+                    <input type="text" id="search-service" class="form-control" placeholder="Buscar serviços por título ou categoria...">
+                    <button class="btn btn-outline-secondary" onclick="loadServices()"><i class="bi bi-search"></i></button>
+                </div>
+            </div>
+
+            <!-- Lista de Serviços -->
+            <div id="services-grid" class="row g-4">
+                <!-- Carregado via JS -->
+            </div>
+        </div>
+
+        <!-- ================= TELA: SOLICITAÇÕES ================= -->
+        <div id="view-requests" class="view-section d-none-custom">
+            <h2 class="page-title">Minhas Solicitações</h2>
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Serviço</th>
+                                <th>Participante</th>
+                                <th>Status</th>
+                                <th>Pagamento</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="requests-list">
+                            <!-- Carregado via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TELA: CHAT ================= -->
+        <div id="view-chat" class="view-section d-none-custom">
+            <div class="d-flex align-items-center mb-3">
+                <button class="btn btn-outline-secondary btn-sm me-3" onclick="navigateTo('requests')"><i class="bi bi-arrow-left"></i> Voltar</button>
+                <h3 class="mb-0">Chat da Solicitação</h3>
+            </div>
+            <div class="row">
+                <div class="col-md-8 mx-auto">
+                    <div class="chat-box" id="chat-messages">
+                        <!-- Mensagens Carregadas via JS -->
+                        <div class="text-center text-muted small mt-auto">Carregando mensagens...</div>
+                    </div>
+                    <form id="form-chat" class="mt-3 d-flex gap-2">
+                        <input type="hidden" id="chat-request-id">
+                        <input type="text" class="form-control" id="chat-input" placeholder="Digite sua mensagem..." required autocomplete="off">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i></button>
+                        <button type="button" class="btn btn-secondary" onclick="loadChatMessages()" title="Atualizar"><i class="bi bi-arrow-clockwise"></i></button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ================= MODAIS ================= -->
+
+    <!-- Modal Criar Serviço (Provider) -->
+    <div class="modal fade" id="modal-create-service" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="form-create-service">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Cadastrar Novo Serviço</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3"><label>Título</label><input type="text" id="svc-title" class="form-control" required></div>
+                        <div class="mb-3"><label>Descrição</label><textarea id="svc-desc" class="form-control" required></textarea></div>
+                        <div class="mb-3"><label>Categoria</label><input type="text" id="svc-cat" class="form-control" required></div>
+                        <div class="mb-3">
+                            <label>Tipo de Preço</label>
+                            <select id="svc-type" class="form-select"><option value="fixed">Fixo</option><option value="hourly">Por Hora</option></select>
+                        </div>
+                        <div class="mb-3"><label>Preço (R$)</label><input type="number" id="svc-price" class="form-control" step="0.01" required></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Salvar Serviço</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Solicitar Serviço (Client) -->
+    <div class="modal fade" id="modal-request-service" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="form-request-service">
+                    <input type="hidden" id="req-service-id">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Solicitar Serviço</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3"><label>Detalhes do problema/necessidade</label><textarea id="req-details" class="form-control" required></textarea></div>
+                        <div class="mb-3"><label>Data Agendamento (Opcional)</label><input type="datetime-local" id="req-date" class="form-control"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-success">Enviar Solicitação</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Avaliação -->
+    <div class="modal fade" id="modal-review" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="form-review">
+                    <input type="hidden" id="rev-request-id">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Avaliar Serviço</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label>Nota (1 a 5)</label>
+                            <input type="number" id="rev-rating" class="form-control" min="1" max="5" required>
+                        </div>
+                        <div class="mb-3"><label>Comentário</label><textarea id="rev-comment" class="form-control"></textarea></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-warning">Enviar Avaliação</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap & JS Vanilla -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        const API_URL = 'http://localhost:3000/api';
+        let currentUser = null;
+        let currentChatInterval = null; // Para simular atualização do chat
+
+        // =============== ROTEAMENTO E SETUP INICIAL ===============
+        document.addEventListener("DOMContentLoaded", () => {
+            const token = localStorage.getItem('token');
+            const userStr = localStorage.getItem('user');
+            
+            if (token && userStr) {
+                currentUser = JSON.parse(userStr);
+                setupAuthenticatedUI();
+                navigateTo('dashboard');
+            } else {
+                navigateTo('login');
+            }
+        });
+
+        function navigateTo(viewId) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.add('d-none-custom'));
+            document.getElementById(`view-${viewId}`).classList.remove('d-none-custom');
+            
+            // Limpar intervalo de chat se sair da tela
+            if (viewId !== 'chat' && currentChatInterval) {
+                clearInterval(currentChatInterval);
+            }
+
+            // Gatilhos de carregamento de dados
+            if (viewId === 'services') loadServices();
+            if (viewId === 'requests') loadRequests();
+        }
+
+        function setupAuthenticatedUI() {
+            document.getElementById('navbar').classList.remove('d-none-custom');
+            document.getElementById('user-greeting').textContent = `${currentUser.name} (${currentUser.role})`;
+            
+            if (currentUser.role === 'provider') {
+                document.getElementById('btn-new-service').classList.remove('d-none-custom');
+            } else {
+                document.getElementById('btn-new-service').classList.add('d-none-custom');
+            }
+        }
+
+        function logout() {
+            localStorage.clear();
+            currentUser = null;
+            document.getElementById('navbar').classList.add('d-none-custom');
+            navigateTo('login');
+        }
+
+        // Wrapper seguro para chamadas da API
+        async function fetchAPI(endpoint, options = {}) {
+            const token = localStorage.getItem('token');
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+            
+            // Se retornar 204 No Content
+            if(res.status === 204) return null;
+
+            const data = await res.json();
+            if (!res.ok) {
+                if (res.status === 401) logout();
+                throw new Error(data.message || 'Erro na requisição');
+            }
+            return data;
+        }
+
+        function showToast(msg) {
+            alert(msg); // Usando alert nativo para simplificar no protótipo SPA único
+        }
+
+        // =============== AUTENTICAÇÃO ===============
+        document.getElementById('form-login').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn-login');
+            const alertBox = document.getElementById('login-alert');
+            btn.disabled = true; alertBox.classList.add('d-none-custom');
+
+            try {
+                const data = await fetchAPI('/auth/login', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        email: document.getElementById('login-email').value,
+                        password: document.getElementById('login-password').value
+                    })
+                });
+                
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                currentUser = data.user;
+                
+                setupAuthenticatedUI();
+                e.target.reset();
+                navigateTo('dashboard');
+            } catch (err) {
+                alertBox.textContent = err.message;
+                alertBox.classList.remove('d-none-custom');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        document.getElementById('form-register').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const alertBox = document.getElementById('register-alert');
+            alertBox.classList.add('d-none-custom');
+
+            try {
+                const data = await fetchAPI('/auth/register', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        name: document.getElementById('reg-name').value,
+                        email: document.getElementById('reg-email').value,
+                        password: document.getElementById('reg-password').value,
+                        role: document.getElementById('reg-role').value
+                    })
+                });
+                
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                currentUser = data.user;
+                
+                setupAuthenticatedUI();
+                e.target.reset();
+                navigateTo('dashboard');
+            } catch (err) {
+                alertBox.textContent = err.message;
+                alertBox.classList.remove('d-none-custom');
+            }
+        });
+
+        // =============== SERVIÇOS ===============
+        async function loadServices() {
+            const search = document.getElementById('search-service').value;
+            const query = search ? `?search=${encodeURIComponent(search)}` : '';
+            
+            try {
+                const services = await fetchAPI(`/services${query}`);
+                const grid = document.getElementById('services-grid');
+                grid.innerHTML = '';
+
+                if(services.length === 0) {
+                    grid.innerHTML = '<div class="col-12 text-center text-muted">Nenhum serviço encontrado.</div>';
+                    return;
+                }
+
+                services.forEach(svc => {
+                    const btnHtml = currentUser.role === 'client' 
+                        ? `<button class="btn btn-sm btn-success w-100 mt-3" onclick="openRequestModal('${svc._id}')">Solicitar Serviço</button>`
+                        : '';
+
+                    grid.innerHTML += `
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card card-service h-100">
+                                <div class="card-body">
+                                    <span class="badge bg-secondary mb-2">${svc.category}</span>
+                                    <h5 class="card-title">${svc.title}</h5>
+                                    <p class="card-text text-muted small">${svc.description}</p>
+                                    <div class="fw-bold text-primary">R$ ${svc.price.toFixed(2)} <small class="text-dark fw-normal">(${svc.pricingType})</small></div>
+                                    <hr>
+                                    <div class="small">Prestador: ${svc.provider.name}</div>
+                                    ${btnHtml}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                console.error(error);
+                showToast("Erro ao carregar serviços");
+            }
+        }
+
+        // Criar Serviço (Provider)
+        document.getElementById('form-create-service').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                await fetchAPI('/services', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        title: document.getElementById('svc-title').value,
+                        description: document.getElementById('svc-desc').value,
+                        category: document.getElementById('svc-cat').value,
+                        pricingType: document.getElementById('svc-type').value,
+                        price: parseFloat(document.getElementById('svc-price').value)
+                    })
+                });
+                bootstrap.Modal.getInstance(document.getElementById('modal-create-service')).hide();
+                e.target.reset();
+                showToast("Serviço criado com sucesso!");
+                loadServices();
+            } catch (err) {
+                showToast(err.message);
+            }
+        });
+
+        // =============== SOLICITAÇÕES ===============
+        function openRequestModal(serviceId) {
+            document.getElementById('req-service-id').value = serviceId;
+            new bootstrap.Modal(document.getElementById('modal-request-service')).show();
+        }
+
+        document.getElementById('form-request-service').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                await fetchAPI('/requests', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        serviceId: document.getElementById('req-service-id').value,
+                        details: document.getElementById('req-details').value,
+                        scheduledAt: document.getElementById('req-date').value || null
+                    })
+                });
+                bootstrap.Modal.getInstance(document.getElementById('modal-request-service')).hide();
+                e.target.reset();
+                showToast("Solicitação enviada! Acompanhe na aba de Solicitações.");
+                navigateTo('requests');
+            } catch (err) {
+                showToast(err.message);
+            }
+        });
+
+        async function loadRequests() {
+            try {
+                const requests = await fetchAPI('/requests/me');
+                const tbody = document.getElementById('requests-list');
+                tbody.innerHTML = '';
+
+                requests.forEach(req => {
+                    // Determinar quem é a outra parte
+                    const otherUser = currentUser.role === 'client' ? req.provider.name : req.client.name;
+                    
+                    // Status Badge
+                    let statusBadge = '';
+                    if(req.status === 'pending') statusBadge = '<span class="badge bg-warning text-dark">Pendente</span>';
+                    if(req.status === 'accepted') statusBadge = '<span class="badge bg-primary">Em Andamento</span>';
+                    if(req.status === 'completed') statusBadge = '<span class="badge bg-success">Concluído</span>';
+
+                    // Payment Badge
+                    let payBadge = req.paymentStatus === 'paid' 
+                        ? '<span class="badge bg-success">Pago</span>' 
+                        : '<span class="badge bg-secondary">Pendente</span>';
+
+                    // Lógica de Botões baseada no Role e Status
+                    let actions = '';
+                    
+                    if (currentUser.role === 'provider' && req.status === 'pending') {
+                        actions += `<button class="btn btn-sm btn-success me-1" onclick="updateReqStatus('${req._id}', 'accepted')">Aceitar</button>`;
+                    }
+                    
+                    if (req.status === 'accepted') {
+                        actions += `<button class="btn btn-sm btn-info me-1" onclick="openChat('${req._id}')"><i class="bi bi-chat-dots"></i> Chat</button>`;
+                        actions += `<button class="btn btn-sm btn-dark me-1" onclick="updateReqStatus('${req._id}', 'completed')">Concluir</button>`;
+                    }
+
+                    if (currentUser.role === 'client' && req.status === 'accepted' && req.paymentStatus !== 'paid') {
+                        actions += `<button class="btn btn-sm btn-warning me-1" onclick="simulatePayment('${req._id}')">Pagar</button>`;
+                    }
+
+                    if (currentUser.role === 'client' && req.status === 'completed') {
+                        actions += `<button class="btn btn-sm btn-outline-warning" onclick="openReview('${req._id}')">Avaliar</button>`;
+                    }
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${req.service.title}</strong><br><small class="text-muted">R$ ${req.priceSnapshot.toFixed(2)}</small></td>
+                            <td>${otherUser}</td>
+                            <td>${statusBadge}</td>
+                            <td>${payBadge}</td>
+                            <td class="text-end">${actions}</td>
+                        </tr>
+                    `;
+                });
+            } catch (err) {
+                showToast("Erro ao carregar solicitações");
+            }
+        }
+
+        async function updateReqStatus(id, newStatus) {
+            try {
+                await fetchAPI(`/requests/${id}/status`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ status: newStatus })
+                });
+                loadRequests();
+            } catch (err) {
+                showToast(err.message);
+            }
+        }
+
+        // =============== PAGAMENTO ===============
+        async function simulatePayment(requestId) {
+            try {
+                await fetchAPI('/payments/simulate', {
+                    method: 'POST',
+                    body: JSON.stringify({ requestId, forceFail: false })
+                });
+                showToast("Pagamento aprovado no sistema!");
+                loadRequests();
+            } catch (err) {
+                showToast(err.message);
+            }
+        }
+
+        // =============== AVALIAÇÃO ===============
+        function openReview(requestId) {
+            document.getElementById('rev-request-id').value = requestId;
+            new bootstrap.Modal(document.getElementById('modal-review')).show();
+        }
+
+        document.getElementById('form-review').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                await fetchAPI('/reviews', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        requestId: document.getElementById('rev-request-id').value,
+                        rating: parseInt(document.getElementById('rev-rating').value),
+                        comment: document.getElementById('rev-comment').value
+                    })
+                });
+                bootstrap.Modal.getInstance(document.getElementById('modal-review')).hide();
+                showToast("Avaliação enviada!");
+                loadRequests();
+            } catch (err) {
+                showToast(err.message);
+            }
+        });
+
+        // =============== CHAT ===============
+        function openChat(requestId) {
+            document.getElementById('chat-request-id').value = requestId;
+            navigateTo('chat');
+            loadChatMessages();
+            
+            // Simula Socket.IO atualizando via polling a cada 5s
+            if(currentChatInterval) clearInterval(currentChatInterval);
+            currentChatInterval = setInterval(loadChatMessages, 5000);
+        }
+
+        async function loadChatMessages() {
+            const reqId = document.getElementById('chat-request-id').value;
+            if(!reqId) return;
+
+            try {
+                const messages = await fetchAPI(`/requests/${reqId}/messages`);
+                const box = document.getElementById('chat-messages');
+                box.innerHTML = '';
+
+                if(messages.length === 0) {
+                    box.innerHTML = '<div class="text-center text-muted small mt-auto mb-auto">Nenhuma mensagem ainda.</div>';
+                    return;
+                }
+
+                messages.forEach(msg => {
+                    const isMine = msg.sender === currentUser.id;
+                    const cssClass = isMine ? 'msg-sent' : 'msg-received';
+                    box.innerHTML += `<div class="msg-bubble ${cssClass}">${msg.content}</div>`;
+                });
+                
+                // Rolar para o final
+                box.scrollTop = box.scrollHeight;
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        document.getElementById('form-chat').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const reqId = document.getElementById('chat-request-id').value;
+            const input = document.getElementById('chat-input');
+            const content = input.value;
+
+            try {
+                await fetchAPI(`/requests/${reqId}/messages`, {
+                    method: 'POST',
+                    body: JSON.stringify({ content })
+                });
+                input.value = '';
+                loadChatMessages();
+            } catch (err) {
+                showToast(err.message);
+            }
+        });
+
+    </script>
+</body>
+</html>

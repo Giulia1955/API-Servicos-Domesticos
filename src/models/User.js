@@ -20,6 +20,7 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ["client", "provider"], required: true },
     bio: { type: String, default: "" },
+    address: { type: String, default: "" },
     portfolio: { type: [String], default: [] },
     categories: { type: [String], default: [] },
     availability: { type: [availabilitySchema], default: [] },

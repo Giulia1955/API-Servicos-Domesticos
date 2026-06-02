@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "main": "src/server.js",
   "scripts": {
-    "test": "node --test",
+    "test": "node --test tests/**/*.test.js",
+    "test:watch": "node --watch --test tests/**/*.test.js",
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "geocode-users": "node src/scripts/geocode_users.js"
   },
   "keywords": [],
   "author": "",
@@ -24,5 +26,12 @@
     "socket.io": "^4.8.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^9.5.0",
+    "rewire": "^9.0.1",
+    "sinon": "^17.0.1",
+    "supertest": "^6.3.4",
+    "testdouble": "^3.20.2"
   }
 }

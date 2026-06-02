@@ -8,6 +8,7 @@
     <!-- Bootstrap 5 CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-odA7S0ya1bQ/56Q9sjgG0LgIPBf9N2fI8ZY2Qjpr4R0=" crossorigin="" />
     
     <style>
         .d-none-custom { display: none !important; }
@@ -25,6 +26,7 @@
         /* Chat UI */
         .chat-box { height: 400px; overflow-y: auto; background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
         .msg-bubble { max-width: 75%; padding: 10px 15px; border-radius: 15px; font-size: 0.95rem; }
+        #map-client-location { height: 400px; width: 100%; }
         .msg-sent { background-color: #0d6efd; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
         .msg-received { background-color: #e9ecef; color: black; align-self: flex-start; border-bottom-left-radius: 2px; }
     </style>
@@ -42,10 +44,12 @@
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item"><a class="nav-link" href="#" onclick="navigateTo('dashboard')">Dashboard</a></li>
                     <li class="nav-item"><a class="nav-link" href="#" onclick="navigateTo('services')">Serviços</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" onclick="navigateTo('providers')">Profissionais</a></li>
                     <li class="nav-item"><a class="nav-link" href="#" onclick="navigateTo('requests')">Minhas Solicitações</a></li>
                 </ul>
                 <div class="d-flex align-items-center text-white">
                     <span id="user-greeting" class="me-3 small fw-bold"></span>
+                    <button id="btn-detect-location" class="btn btn-outline-light btn-sm d-none-custom me-2" onclick="detectAndSendLocation()">Detectar localização</button>
                     <button class="btn btn-outline-light btn-sm" onclick="logout()">Sair</button>
                 </div>
             </div>
@@ -97,17 +101,47 @@
                             <label class="form-label text-muted small">Senha</label>
                             <input type="password" class="form-control" id="reg-password" required>
                         </div>
-                        <div class="mb-4">
+                        <div class="mb-3">
                             <label class="form-label text-muted small">Você é:</label>
                             <select class="form-select" id="reg-role" required>
                                 <option value="client">Cliente (Quero contratar)</option>
                                 <option value="provider">Prestador (Quero trabalhar)</option>
                             </select>
                         </div>
+                        <div class="mb-4">
+                            <label class="form-label text-muted small">Biografia (Opcional, bom para Prestadores)</label>
+                            <textarea class="form-control" id="reg-bio" rows="2" placeholder="Fale um pouco sobre você e sua experiência..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Endereço (Rua, número, cidade)</label>
+                            <input type="text" class="form-control" id="reg-address" placeholder="Ex: Rua das Flores, 123, São Paulo" >
+                        </div>
+                        <input type="hidden" id="reg-lat">
+                        <input type="hidden" id="reg-lng">
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="captureRegistrationCoords()">Detectar coords (GPS)</button>
+                            <small class="text-muted ms-2">Use para preencher latitude/longitude no cadastro.</small>
+                        </div>
                         <button type="submit" class="btn btn-success w-100 fw-bold" id="btn-register">Criar Conta</button>
                     </form>
                     <div class="text-center mt-3 small">
                         Já tem conta? <a href="#" onclick="navigateTo('login')" class="text-decoration-none">Faça Login</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de mapa do cliente para providers -->
+        <div class="modal fade" id="modal-client-map" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Localização do Cliente</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="map-client-location"></div>
+                        <div id="map-client-info" class="mt-3 small text-muted"></div>
                     </div>
                 </div>
             </div>
@@ -123,6 +157,15 @@
                             <h5>Catálogo de Serviços</h5>
                             <p class="small">Encontre profissionais para sua necessidade.</p>
                             <button class="btn btn-light btn-sm mt-2" onclick="navigateTo('services')">Acessar Serviços</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="card bg-info text-white h-100 border-0 rounded-3">
+                        <div class="card-body">
+                            <h5>Profissionais</h5>
+                            <p class="small">Veja a lista e avaliação dos nossos prestadores.</p>
+                            <button class="btn btn-light btn-sm mt-2" onclick="navigateTo('providers')">Ver Profissionais</button>
                         </div>
                     </div>
                 </div>
@@ -150,14 +193,23 @@
             
             <!-- Barra de Busca -->
             <div class="card mb-4 border-0 shadow-sm">
-                <div class="card-body d-flex gap-2">
+                <form class="card-body d-flex gap-2" onsubmit="event.preventDefault(); loadServices();">
                     <input type="text" id="search-service" class="form-control" placeholder="Buscar serviços por título ou categoria...">
-                    <button class="btn btn-outline-secondary" onclick="loadServices()"><i class="bi bi-search"></i></button>
-                </div>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Buscar</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('search-service').value=''; loadServices();" title="Limpar Busca"><i class="bi bi-x-lg"></i></button>
+                </form>
             </div>
 
             <!-- Lista de Serviços -->
             <div id="services-grid" class="row g-4">
+                <!-- Carregado via JS -->
+            </div>
+        </div>
+
+        <!-- ================= TELA: PROFISSIONAIS ================= -->
+        <div id="view-providers" class="view-section d-none-custom">
+            <h2 class="page-title">Profissionais Cadastrados</h2>
+            <div id="providers-grid" class="row g-4">
                 <!-- Carregado via JS -->
             </div>
         </div>
@@ -287,8 +339,24 @@
         </div>
     </div>
 
+    <!-- Modal Listar Avaliações do Provedor -->
+    <div class="modal fade" id="modal-provider-reviews" tabindex="-1">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Avaliações: <strong id="pr-name" class="text-primary"></strong></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="pr-list">
+                    <!-- Avaliações aqui -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap & JS Vanilla -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-o1Kw7wnJfCpXDEcCd42nPj0GJh0QY47F5gFOq61P9H0=" crossorigin=""></script>
     
     <script>
         const API_URL = 'http://localhost:3000/api';
@@ -321,16 +389,22 @@
             // Gatilhos de carregamento de dados
             if (viewId === 'services') loadServices();
             if (viewId === 'requests') loadRequests();
+            if (viewId === 'providers') loadProviders();
         }
 
         function setupAuthenticatedUI() {
             document.getElementById('navbar').classList.remove('d-none-custom');
             document.getElementById('user-greeting').textContent = `${currentUser.name} (${currentUser.role})`;
             
+            // Mostrar botões conforme role
             if (currentUser.role === 'provider') {
                 document.getElementById('btn-new-service').classList.remove('d-none-custom');
+                const detectBtn = document.getElementById('btn-detect-location');
+                if (detectBtn) detectBtn.classList.remove('d-none-custom');
             } else {
                 document.getElementById('btn-new-service').classList.add('d-none-custom');
+                const detectBtn = document.getElementById('btn-detect-location');
+                if (detectBtn) detectBtn.classList.add('d-none-custom');
             }
         }
 
@@ -362,6 +436,74 @@
 
         function showToast(msg) {
             alert(msg); // Usando alert nativo para simplificar no protótipo SPA único
+        }
+
+        function openClientMap(requestId) {
+            const req = (window.currentRequests || []).find(r => r._id === requestId);
+            if (!req || !req.client || !req.client.location || !Array.isArray(req.client.location.coordinates)) {
+                showToast('Localização do cliente indisponível.');
+                return;
+            }
+
+            const [lng, lat] = req.client.location.coordinates;
+            const address = req.client.address || 'Endereço não informado';
+            const info = document.getElementById('map-client-info');
+            const modalEl = document.getElementById('modal-client-map');
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+
+            setTimeout(() => {
+                const mapContainer = document.getElementById('map-client-location');
+                mapContainer.innerHTML = '';
+                const map = L.map('map-client-location').setView([lat, lng], 14);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(map);
+                L.marker([lat, lng]).addTo(map).bindPopup(`<strong>Cliente</strong><br>${address}`).openPopup();
+
+                let distanceText = '';
+                const renderDistance = (providerLat, providerLng) => {
+                    const dist = haversineKm(providerLat, providerLng, lat, lng);
+                    if (dist != null) {
+                        distanceText = `Distância aproximada: ${dist.toFixed(2)} km.`;
+                    }
+                    info.textContent = `${address}. ${distanceText}`;
+                };
+
+                if (currentUser.location && currentUser.location.lat != null && currentUser.location.lng != null) {
+                    renderDistance(currentUser.location.lat, currentUser.location.lng);
+                } else if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition((position) => {
+                        renderDistance(position.coords.latitude, position.coords.longitude);
+                    }, () => {
+                        info.textContent = `${address}. Distância não disponível.`;
+                    });
+                } else {
+                    info.textContent = `${address}. Distância não disponível.`;
+                }
+            }, 100);
+        }
+
+        // Calcula distância (km) entre duas coordenadas (haversine)
+        function haversineKm(lat1, lon1, lat2, lon2) {
+            if (![lat1,lon1,lat2,lon2].every(v => typeof v === 'number')) return null;
+            const toRad = v => (v * Math.PI) / 180;
+            const R = 6371; // km
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function renderStars(rating) {
+            let html = '';
+            for(let i=1; i<=5; i++) {
+                if (i <= rating) html += '<i class="bi bi-star-fill"></i> ';
+                else if (i - 0.5 <= rating) html += '<i class="bi bi-star-half"></i> ';
+                else html += '<i class="bi bi-star"></i> ';
+            }
+            return html;
         }
 
         // =============== AUTENTICAÇÃO ===============
@@ -401,15 +543,25 @@
             alertBox.classList.add('d-none-custom');
 
             try {
+                const payload = {
+                    name: document.getElementById('reg-name').value,
+                    email: document.getElementById('reg-email').value,
+                    password: document.getElementById('reg-password').value,
+                    role: document.getElementById('reg-role').value,
+                    bio: document.getElementById('reg-bio').value,
+                    address: document.getElementById('reg-address').value
+                };
+
+                // If geolocation was captured during registration, include it
+                const regLat = parseFloat(document.getElementById('reg-lat')?.value);
+                const regLng = parseFloat(document.getElementById('reg-lng')?.value);
+                if (!isNaN(regLat) && !isNaN(regLng)) payload.location = { lat: regLat, lng: regLng };
+
                 const data = await fetchAPI('/auth/register', {
                     method: 'POST',
-                    body: JSON.stringify({
-                        name: document.getElementById('reg-name').value,
-                        email: document.getElementById('reg-email').value,
-                        password: document.getElementById('reg-password').value,
-                        role: document.getElementById('reg-role').value
-                    })
+                    body: JSON.stringify(payload)
                 });
+
                 
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('user', JSON.stringify(data.user));
@@ -423,6 +575,52 @@
                 alertBox.classList.remove('d-none-custom');
             }
         });
+
+        document.getElementById('reg-role').addEventListener('change', () => {
+            const role = document.getElementById('reg-role').value;
+            const addressInput = document.getElementById('reg-address');
+            if (role === 'client') {
+                addressInput.required = true;
+                addressInput.placeholder = 'Ex: Rua das Flores, 123, São Paulo';
+            } else {
+                addressInput.required = false;
+            }
+        });
+
+        // Captura coordenadas via Geolocation durante registro
+        function captureRegistrationCoords() {
+            if (!navigator.geolocation) return showToast('Geolocalização não suportada neste navegador.');
+            navigator.geolocation.getCurrentPosition((pos) => {
+                document.getElementById('reg-lat').value = pos.coords.latitude;
+                document.getElementById('reg-lng').value = pos.coords.longitude;
+                showToast('Coordenadas capturadas. Você pode prosseguir com o cadastro.');
+            }, (err) => {
+                showToast('Falha ao obter coordenadas: ' + err.message);
+            }, { enableHighAccuracy: true, timeout: 10000 });
+        }
+
+        async function detectAndSendLocation() {
+            if (!navigator.geolocation) return showToast('Geolocalização não suportada neste navegador.');
+            showToast('Obtendo localização...');
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                try {
+                    const res = await fetchAPI('/auth/me', {
+                        method: 'PATCH',
+                        body: JSON.stringify({ location: { lat, lng } })
+                    });
+                    // Atualiza currentUser e storage
+                    currentUser = res.user;
+                    localStorage.setItem('user', JSON.stringify(currentUser));
+                    showToast('Localização salva no perfil.');
+                } catch (err) {
+                    showToast('Erro ao salvar localização: ' + err.message);
+                }
+            }, (err) => {
+                showToast('Falha ao obter coordenadas: ' + err.message);
+            }, { enableHighAccuracy: true, timeout: 10000 });
+        }
 
         // =============== SERVIÇOS ===============
         async function loadServices() {
@@ -440,9 +638,19 @@
                 }
 
                 services.forEach(svc => {
-                    const btnHtml = currentUser.role === 'client' 
-                        ? `<button class="btn btn-sm btn-success w-100 mt-3" onclick="openRequestModal('${svc._id}')">Solicitar Serviço</button>`
-                        : '';
+                    // Verifica se o usuário logado é o dono do serviço
+                    const providerId = svc.provider._id || svc.provider;
+                    const isOwner = currentUser.role === 'provider' && providerId === currentUser.id;
+                    
+                    let btnHtml = '';
+                    
+                    if (currentUser.role === 'client') {
+                        btnHtml = `<button class="btn btn-sm btn-success w-100 mt-3" onclick="openRequestModal('${svc._id}')">Solicitar Serviço</button>`;
+                    } else if (isOwner) {
+                        btnHtml = `<button class="btn btn-sm btn-danger w-100 mt-3" onclick="deleteService('${svc._id}')"><i class="bi bi-trash"></i> Excluir Serviço</button>`;
+                    }
+
+                    const starsHtml = renderStars(svc.provider.ratingAvg || 0);
 
                     grid.innerHTML += `
                         <div class="col-md-6 col-lg-4">
@@ -453,7 +661,11 @@
                                     <p class="card-text text-muted small">${svc.description}</p>
                                     <div class="fw-bold text-primary">R$ ${svc.price.toFixed(2)} <small class="text-dark fw-normal">(${svc.pricingType})</small></div>
                                     <hr>
-                                    <div class="small">Prestador: ${svc.provider.name}</div>
+                                    <div class="small mb-2">
+                                        <strong>Prestador:</strong> ${svc.provider.name || 'Desconhecido'}<br>
+                                        <span class="text-warning">${starsHtml}</span> <small>(${svc.provider.ratingCount || 0})</small>
+                                        <br><a href="#" class="text-decoration-none small" onclick="loadProviderReviews('${providerId}', '${svc.provider.name}')">Ver avaliações</a>
+                                    </div>
                                     ${btnHtml}
                                 </div>
                             </div>
@@ -463,6 +675,17 @@
             } catch (error) {
                 console.error(error);
                 showToast("Erro ao carregar serviços");
+            }
+        }
+
+        async function deleteService(id) {
+            if(!confirm("Tem certeza que deseja excluir este serviço?")) return;
+            try {
+                await fetchAPI(`/services/${id}`, { method: 'DELETE' });
+                showToast("Serviço excluído com sucesso!");
+                loadServices();
+            } catch (err) {
+                showToast(err.message);
             }
         }
 
@@ -488,6 +711,84 @@
                 showToast(err.message);
             }
         });
+
+        // =============== PROFISSIONAIS E AVALIAÇÕES ===============
+        async function loadProviders() {
+            try {
+                // Workaround: extrair prestadores a partir dos serviços listados, 
+                // já que não há uma rota direta na API de 'listar provedores'
+                const services = await fetchAPI(`/services`);
+                const providersMap = new Map();
+                
+                services.forEach(svc => {
+                    if(svc.provider && svc.provider._id) {
+                        if(!providersMap.has(svc.provider._id)) {
+                            providersMap.set(svc.provider._id, svc.provider);
+                        }
+                    }
+                });
+
+                const grid = document.getElementById('providers-grid');
+                grid.innerHTML = '';
+                
+                if(providersMap.size === 0) {
+                     grid.innerHTML = '<div class="col-12 text-center text-muted">Nenhum profissional com serviço cadastrado.</div>';
+                     return;
+                }
+
+                providersMap.forEach(provider => {
+                    const stars = renderStars(provider.ratingAvg || 0);
+                    grid.innerHTML += `
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card card-service h-100">
+                                <div class="card-body text-center">
+                                    <div class="mb-3">
+                                        <i class="bi bi-person-circle text-secondary" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <h5 class="card-title">${provider.name}</h5>
+                                    <p class="text-muted small">${provider.bio || 'Sem biografia disponível.'}</p>
+                                    <div class="mb-3 text-warning">${stars} <br><small class="text-muted">(${provider.ratingCount || 0} avaliações)</small></div>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="loadProviderReviews('${provider._id}', '${provider.name}')">Ler Avaliações</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                showToast("Erro ao carregar profissionais");
+            }
+        }
+
+        async function loadProviderReviews(providerId, providerName) {
+            try {
+                const reviews = await fetchAPI(`/reviews/provider/${providerId}`);
+                document.getElementById('pr-name').textContent = providerName;
+                const list = document.getElementById('pr-list');
+                list.innerHTML = '';
+                
+                if (reviews.length === 0) {
+                    list.innerHTML = '<p class="text-muted text-center mt-3">Nenhuma avaliação recebida ainda.</p>';
+                } else {
+                    reviews.forEach(r => {
+                        const stars = renderStars(r.rating);
+                        const date = new Date(r.createdAt).toLocaleDateString('pt-BR');
+                        list.innerHTML += `
+                            <div class="border-bottom pb-2 mb-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <strong>${r.client?.name || 'Cliente Oculto'}</strong>
+                                    <span class="text-muted small">${date}</span>
+                                </div>
+                                <div class="text-warning small mb-1">${stars}</div>
+                                <p class="mb-0 small">${r.comment || 'Nenhum comentário.'}</p>
+                            </div>
+                        `;
+                    });
+                }
+                new bootstrap.Modal(document.getElementById('modal-provider-reviews')).show();
+            } catch(err) {
+                showToast(err.message);
+            }
+        }
 
         // =============== SOLICITAÇÕES ===============
         function openRequestModal(serviceId) {
@@ -518,18 +819,20 @@
         async function loadRequests() {
             try {
                 const requests = await fetchAPI('/requests/me');
+                window.currentRequests = requests;
                 const tbody = document.getElementById('requests-list');
                 tbody.innerHTML = '';
 
                 requests.forEach(req => {
                     // Determinar quem é a outra parte
-                    const otherUser = currentUser.role === 'client' ? req.provider.name : req.client.name;
+                    const otherUser = currentUser.role === 'client' ? (req.provider?.name || 'Prestador') : (req.client?.name || 'Cliente');
                     
                     // Status Badge
                     let statusBadge = '';
                     if(req.status === 'pending') statusBadge = '<span class="badge bg-warning text-dark">Pendente</span>';
                     if(req.status === 'accepted') statusBadge = '<span class="badge bg-primary">Em Andamento</span>';
                     if(req.status === 'completed') statusBadge = '<span class="badge bg-success">Concluído</span>';
+                    if(req.status === 'rejected') statusBadge = '<span class="badge bg-danger">Rejeitado</span>';
 
                     // Payment Badge
                     let payBadge = req.paymentStatus === 'paid' 
@@ -541,14 +844,24 @@
                     
                     if (currentUser.role === 'provider' && req.status === 'pending') {
                         actions += `<button class="btn btn-sm btn-success me-1" onclick="updateReqStatus('${req._id}', 'accepted')">Aceitar</button>`;
+                        actions += `<button class="btn btn-sm btn-danger me-1" onclick="updateReqStatus('${req._id}', 'rejected')">Rejeitar</button>`;
                     }
                     
-                    if (req.status === 'accepted') {
-                        actions += `<button class="btn btn-sm btn-info me-1" onclick="openChat('${req._id}')"><i class="bi bi-chat-dots"></i> Chat</button>`;
+                    // O Chat agora aparece tanto para 'Em Andamento' quanto 'Concluído'
+                    if (['accepted', 'completed'].includes(req.status)) {
+                        actions += `<button class="btn btn-sm btn-info me-1 text-white" onclick="openChat('${req._id}')"><i class="bi bi-chat-dots"></i> Chat</button>`;
+                    }
+
+                    if (req.status === 'accepted' && currentUser.role === 'provider') {
                         actions += `<button class="btn btn-sm btn-dark me-1" onclick="updateReqStatus('${req._id}', 'completed')">Concluir</button>`;
                     }
 
-                    if (currentUser.role === 'client' && req.status === 'accepted' && req.paymentStatus !== 'paid') {
+                    if (currentUser.role === 'provider' && req.client && req.client.location && Array.isArray(req.client.location.coordinates)) {
+                        actions += `<button class="btn btn-sm btn-outline-info me-1" onclick="openClientMap('${req._id}')">Ver mapa</button>`;
+                    }
+
+                    // A alteração foi feita nesta linha (aceito ou concluído permite pagamento se não estiver pago)
+                    if (currentUser.role === 'client' && ['accepted', 'completed'].includes(req.status) && req.paymentStatus !== 'paid') {
                         actions += `<button class="btn btn-sm btn-warning me-1" onclick="simulatePayment('${req._id}')">Pagar</button>`;
                     }
 
@@ -556,10 +869,29 @@
                         actions += `<button class="btn btn-sm btn-outline-warning" onclick="openReview('${req._id}')">Avaliar</button>`;
                     }
 
+                    // Montar coluna do participante com endereço/distância quando aplicável
+                    let participantHtml = otherUser;
+                    if (currentUser.role === 'provider' && req.client) {
+                        const addr = req.client.address || '';
+                        let distHtml = '';
+                        if (currentUser.location && currentUser.location.lat != null && req.client.location && Array.isArray(req.client.location.coordinates)) {
+                            const provLat = currentUser.location.lat;
+                            const provLng = currentUser.location.lng;
+                            const cliLat = req.client.location.coordinates[1];
+                            const cliLng = req.client.location.coordinates[0];
+                            const d = haversineKm(provLat, provLng, cliLat, cliLng);
+                            if (d != null) distHtml = ` — ${d.toFixed(2)} km`;
+                        }
+                        participantHtml = `${otherUser}<br><small class="text-muted">${addr}${distHtml}</small>`;
+                    } else if (currentUser.role === 'client' && req.provider) {
+                        const addr = req.provider.address || '';
+                        participantHtml = `${otherUser}<br><small class="text-muted">${addr}</small>`;
+                    }
+
                     tbody.innerHTML += `
                         <tr>
-                            <td><strong>${req.service.title}</strong><br><small class="text-muted">R$ ${req.priceSnapshot.toFixed(2)}</small></td>
-                            <td>${otherUser}</td>
+                            <td><strong>${req.service?.title || 'Serviço'}</strong><br><small class="text-muted">R$ ${req.priceSnapshot?.toFixed(2) || 0}</small></td>
+                            <td>${participantHtml}</td>
                             <td>${statusBadge}</td>
                             <td>${payBadge}</td>
                             <td class="text-end">${actions}</td>
@@ -574,7 +906,7 @@
         async function updateReqStatus(id, newStatus) {
             try {
                 await fetchAPI(`/requests/${id}/status`, {
-                    method: 'PUT',
+                    method: 'PATCH',
                     body: JSON.stringify({ status: newStatus })
                 });
                 loadRequests();
@@ -591,7 +923,18 @@
                     body: JSON.stringify({ requestId, forceFail: false })
                 });
                 showToast("Pagamento aprovado no sistema!");
-                loadRequests();
+                await loadRequests();
+                
+                // Abre o modal de avaliação automaticamente se o serviço já estiver concluído
+                setTimeout(() => {
+                    const reviewBtn = document.querySelector(`button[onclick="openReview('${requestId}')"]`);
+                    if(reviewBtn) {
+                        if(confirm("Deseja avaliar o serviço agora?")) {
+                            openReview(requestId);
+                        }
+                    }
+                }, 600);
+                
             } catch (err) {
                 showToast(err.message);
             }
@@ -638,7 +981,8 @@
             if(!reqId) return;
 
             try {
-                const messages = await fetchAPI(`/requests/${reqId}/messages`);
+                // Atualizado para refletir o prefixo /chat (caso o router esteja montado em /api/chat)
+                const messages = await fetchAPI(`/chat/requests/${reqId}/messages`);
                 const box = document.getElementById('chat-messages');
                 box.innerHTML = '';
 
@@ -667,7 +1011,8 @@
             const content = input.value;
 
             try {
-                await fetchAPI(`/requests/${reqId}/messages`, {
+                // Atualizado para refletir o prefixo /chat
+                await fetchAPI(`/chat/requests/${reqId}/messages`, {
                     method: 'POST',
                     body: JSON.stringify({ content })
                 });

@@ -45,8 +45,8 @@ export const listMyRequests = asyncHandler(async (req, res) => {
 
   const requests = await ServiceRequest.find(filter)
     .populate("service", "title category pricingType price")
-    .populate("client", "name email")
-    .populate("provider", "name email")
+    .populate("client", "name email address location")
+    .populate("provider", "name email address location")
     .sort({ createdAt: -1 });
 
   res.json(requests);
